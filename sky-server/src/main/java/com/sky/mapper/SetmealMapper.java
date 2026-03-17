@@ -53,4 +53,11 @@ public interface SetmealMapper {
      * @param setmealIds
      */
     void deleteByIds(List<Long> setmealIds);
+
+    /**
+     * 根据setmeal修改菜品数据
+     * @param setmeal
+     */
+    @AutoFill(value = OperationType.UPDATE)
+    void update(Setmeal setmeal);
 }
