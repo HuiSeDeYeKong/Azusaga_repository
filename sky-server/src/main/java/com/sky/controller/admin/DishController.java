@@ -11,6 +11,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,11 +28,18 @@ public class DishController {
     @Autowired
     private DishService dishService;
 
+    @Autowired
+    private RedisTemplate redisTemplate;
+
     @PostMapping
     @ApiOperation("新增菜品")
     public Result save(@RequestBody DishDTO dishDTO) {
         log.info("新增菜品：{}", dishDTO);
         dishService.saveWithFlavor(dishDTO);
+
+        //清理缓存数据
+        String key = "dish_" + dishDTO.getCategoryId();
+        cleanCache(key);
         return Result.success();
     }
 
@@ -55,8 +63,9 @@ public class DishController {
     @ApiOperation("批量删除菜品")
     public Result delete(@RequestParam List<Long> ids){
         log.info("批量删除菜品：{}", ids);
-        //TODO 批量删除菜品
         dishService.deleteBatch(ids);
+        //将所有菜品缓存数据清除，所有dish_开头的key都删除
+        cleanCache("dish_*");
         return Result.success();
     }
 
@@ -83,6 +92,8 @@ public class DishController {
     public Result update(@RequestBody DishDTO dishDTO){
         log.info("修改菜品：{}", dishDTO);
         dishService.updateWithFlavor(dishDTO);
+        //如果是修改菜品分类，那么就会涉及到两个分类的菜品数据需要清除缓存，所以直接将所有菜品缓存数据清除，所有dish_开头的key都删除
+        cleanCache("dish_*");
         return Result.success();
     }
 
@@ -98,6 +109,17 @@ public class DishController {
     public Result startOrStop(@PathVariable Integer status, Long id) {
         log.info("起售或停售菜品：id={}, status={}", id, status);
         dishService.startOrStop(status, id);
+        //如果是起售菜品，那么就会涉及到菜品分类的菜品数据需要清除缓存，所以直接将所有菜品缓存数据清除，所有dish_开头的key都删除
+        cleanCache("dish_*");
         return Result.success();
     }
+
+    /**
+     * 清理缓存数据
+     * @param pattern
+     */
+    private void cleanCache(String pattern){
+        redisTemplate.delete(redisTemplate.keys(pattern));
+    }
+
 }
