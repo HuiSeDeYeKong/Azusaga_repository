@@ -71,7 +71,19 @@ public class ShoppingCartServiceImpl implements ShoppingCartService {
             shoppingCart.setCreateTime(LocalDateTime.now());
             shoppingCartMapper.insert(shoppingCart);
         }
+    }
 
 
+    /**
+     * 查询购物车列表
+     * @return
+     */
+    public List<ShoppingCart> showShoppingCart() {
+        Long userId = BaseContext.getCurrentId();
+        ShoppingCart shoppingCart = ShoppingCart.builder()
+                .userId(userId)
+                .build();
+        List<ShoppingCart> list = shoppingCartMapper.list(shoppingCart);
+        return list;
     }
 }
