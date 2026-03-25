@@ -217,6 +217,63 @@ public class OrderServiceImpl implements OrderService {
         BeanUtils.copyProperties(orders, orderVO);
         orderVO.setOrderDetailList(detailList);
         return orderVO;
+    }
 
+    /**
+     * 用户取消订单
+     * @param id
+     */
+    public void userCancelById(Long id) throws Exception {
+        Orders ordersDB = orderMapper.getById(id);
+        // 校验订单是否存在
+        if (ordersDB == null) {
+            throw new OrderBusinessException(MessageConstant.ORDER_NOT_FOUND);
+        }
+        //商家已接单(3)状态下，用户取消订单需电话沟通商家
+        //派送中(4)状态下，用户取消订单需电话沟通商家
+        //5已完成 6已取消
+        if (ordersDB.getStatus() > 2) {
+            throw new OrderBusinessException(MessageConstant.ORDER_STATUS_ERROR);
+        }
+
+        //新创建一个订单对象，用于设置要修改的字段，若使用ordersDB对象直接修改，可能会把不需要修改的字段也修改了
+        Orders orders = new Orders();
+        orders.setId(ordersDB.getId());
+
+        //待支付(1)和待接单(2)状态下，用户可直接取消订单
+        if(ordersDB.getStatus().equals(Orders.TO_BE_CONFIRMED)) {
+            //如果在待接单状态下取消订单，需要给用户退款
+            //调用微信支付退款接口
+            weChatPayUtil.refund(
+                    ordersDB.getNumber(), //商户订单号
+                    ordersDB.getNumber(), //商户退款单号
+                    new BigDecimal(0.01),//退款金额，单位 元
+                    new BigDecimal(0.01));//原订单金额
+
+            //支付状态修改为 退款
+            orders.setPayStatus(Orders.REFUND);
+        }
+        // 更新订单状态、取消原因、取消时间
+        orders.setStatus(Orders.CANCELLED);
+        orders.setCancelReason("用户取消");
+        orders.setCancelTime(LocalDateTime.now());
+        orderMapper.update(orders);
+    }
+
+    /**
+     * 用户再次购买
+     * @param id
+     */
+    public void repetition(Long id) {
+        List<ShoppingCart> shoppingCartList = new ArrayList<>();
+        //查询订单明细，封装成购物车数据，批量插入购物车表
+        orderDetailMapper.getByOrderId(id).forEach(orderDetail -> {
+            ShoppingCart shoppingCart = new ShoppingCart();
+            BeanUtils.copyProperties(orderDetail, shoppingCart);
+            shoppingCart.setUserId(BaseContext.getCurrentId());
+            shoppingCart.setCreateTime(LocalDateTime.now());
+            shoppingCartList.add(shoppingCart);
+        });
+        shoppingCartMapper.insertBatch(shoppingCartList);
     }
 }
