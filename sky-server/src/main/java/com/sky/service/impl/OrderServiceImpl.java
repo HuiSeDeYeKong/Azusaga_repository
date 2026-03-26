@@ -337,6 +337,7 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 商家确认订单
+     *
      * @param ordersConfirmDTO
      */
     @Override
@@ -351,6 +352,7 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 商家拒绝订单
+     *
      * @param ordersRejectionDTO
      */
     public void rejectOrder(OrdersRejectionDTO ordersRejectionDTO) throws Exception {
@@ -361,7 +363,7 @@ public class OrderServiceImpl implements OrderService {
         }
         //查支付状态，如果订单已支付，商家拒单需要给用户退款
         Integer payStatus = ordersDB.getPayStatus();
-        if(payStatus.equals(Orders.PAID)) {
+        if (payStatus.equals(Orders.PAID)) {
             //调用微信支付退款接口
             weChatPayUtil.refund(
                     ordersDB.getNumber(), //商户订单号
@@ -375,6 +377,33 @@ public class OrderServiceImpl implements OrderService {
                 .id(ordersDB.getId())
                 .status(Orders.CANCELLED)
                 .cancelReason(ordersRejectionDTO.getRejectionReason())
+                .cancelTime(LocalDateTime.now())
+                .build();
+        orderMapper.update(orders);
+    }
+
+    /**
+     * 商家取消订单
+     *
+     * @param ordersCancelDTO
+     */
+    public void cancelOrder(OrdersCancelDTO ordersCancelDTO) throws Exception {
+        Orders ordersDB = orderMapper.getById(ordersCancelDTO.getId());
+        //如果用户已付款，商家取消订单需要给用户退款
+        if (ordersDB.getPayStatus().equals(Orders.PAID)) {
+            //调用微信支付退款接口
+            weChatPayUtil.refund(
+                    ordersDB.getNumber(), //商户订单号
+                    ordersDB.getNumber(), //商户退款单号
+                    new BigDecimal(0.01),//退款金额，单位 元
+                    new BigDecimal(0.01));//原订单金额
+            log.info("商家取消订单，订单已支付，已调用微信支付退款接口完成退款，订单号：{}", ordersDB.getNumber());
+        }
+        //更新订单状态为已取消，设置取消原因和取消时间
+        Orders orders = Orders.builder()
+                .id(ordersDB.getId())
+                .status(Orders.CANCELLED)
+                .cancelReason(ordersCancelDTO.getCancelReason())
                 .cancelTime(LocalDateTime.now())
                 .build();
         orderMapper.update(orders);
