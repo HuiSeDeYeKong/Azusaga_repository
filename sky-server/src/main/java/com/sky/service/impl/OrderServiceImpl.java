@@ -17,6 +17,7 @@ import com.sky.result.PageResult;
 import com.sky.service.OrderService;
 import com.sky.utils.WeChatPayUtil;
 import com.sky.vo.OrderPaymentVO;
+import com.sky.vo.OrderStatisticsVO;
 import com.sky.vo.OrderSubmitVO;
 import com.sky.vo.OrderVO;
 import org.springframework.beans.BeanUtils;
@@ -110,7 +111,6 @@ public class OrderServiceImpl implements OrderService {
     }
 
 
-
     /**
      * 订单支付
      *
@@ -164,6 +164,7 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 历史订单查询
+     *
      * @param pageNum
      * @param pageSize
      * @param status
@@ -204,6 +205,7 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 订单详情查询
+     *
      * @param id
      * @return
      */
@@ -221,6 +223,7 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 用户取消订单
+     *
      * @param id
      */
     public void userCancelById(Long id) throws Exception {
@@ -241,7 +244,7 @@ public class OrderServiceImpl implements OrderService {
         orders.setId(ordersDB.getId());
 
         //待支付(1)和待接单(2)状态下，用户可直接取消订单
-        if(ordersDB.getStatus().equals(Orders.TO_BE_CONFIRMED)) {
+        if (ordersDB.getStatus().equals(Orders.TO_BE_CONFIRMED)) {
             //如果在待接单状态下取消订单，需要给用户退款
             //调用微信支付退款接口
             weChatPayUtil.refund(
@@ -262,6 +265,7 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 用户再次购买
+     *
      * @param id
      */
     public void repetition(Long id) {
@@ -280,6 +284,7 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 订单条件查询
+     *
      * @param ordersPageQueryDTO
      * @return
      */
@@ -315,5 +320,18 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return new PageResult(page.getTotal(), list);
+    }
+
+    /**
+     * 各状态订单数量统计
+     *
+     * @return
+     */
+    public OrderStatisticsVO statistics() {
+        OrderStatisticsVO orderStatisticsVO = new OrderStatisticsVO();
+        orderStatisticsVO.setToBeConfirmed(orderMapper.countByStatus(Orders.TO_BE_CONFIRMED));
+        orderStatisticsVO.setConfirmed(orderMapper.countByStatus(Orders.CONFIRMED));
+        orderStatisticsVO.setDeliveryInProgress(orderMapper.countByStatus(Orders.DELIVERY_IN_PROGRESS));
+        return orderStatisticsVO;
     }
 }
