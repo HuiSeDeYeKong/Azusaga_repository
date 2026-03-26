@@ -276,4 +276,44 @@ public class OrderServiceImpl implements OrderService {
         });
         shoppingCartMapper.insertBatch(shoppingCartList);
     }
+
+
+    /**
+     * 订单条件查询
+     * @param ordersPageQueryDTO
+     * @return
+     */
+    public PageResult conditionSearch(OrdersPageQueryDTO ordersPageQueryDTO) {
+        //设置分页
+        PageHelper.startPage(ordersPageQueryDTO.getPage(), ordersPageQueryDTO.getPageSize());
+        //分页条件查询
+        Page<Orders> page = orderMapper.pageQuery(ordersPageQueryDTO);
+
+        List<OrderVO> list = new ArrayList();
+
+        // 查询出订单明细，并封装入OrderVO进行响应
+        if (page != null && page.getTotal() > 0) {
+            for (Orders orders : page) {
+                Long orderId = orders.getId();// 订单id
+
+                // 查询订单明细
+                List<OrderDetail> orderDetails = orderDetailMapper.getByOrderId(orderId);
+                //将订单明细的商品以及数量提取、拼接成字符串，设置到OrderVO的orderDishes字段中，例如 宫保鸡丁*3;
+                StringBuilder orderDishes = new StringBuilder();
+                for (OrderDetail orderDetail : orderDetails) {
+                    orderDishes.append(orderDetail.getName())
+                            .append("*")
+                            .append(orderDetail.getNumber())
+                            .append(";");
+                }
+                OrderVO orderVO = new OrderVO();
+                BeanUtils.copyProperties(orders, orderVO);
+                orderVO.setOrderDishes(orderDishes.toString());
+
+                list.add(orderVO);
+            }
+        }
+
+        return new PageResult(page.getTotal(), list);
+    }
 }
