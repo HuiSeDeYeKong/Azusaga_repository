@@ -100,11 +100,24 @@ public class OrderController {
         return Result.success();
      }
 
+    /**
+     * 商家派送订单接口
+     * @param id
+     * @return
+     */
      @PutMapping("/delivery/{id}")
      @ApiOperation("value = 商家派送订单接口")
      public Result deliveryOrder(@PathVariable Long id) {
          log.info("商家派送订单，订单id：{}", id);
          orderService.deliveryOrder(id);
+         return Result.success();
+     }
+
+     @PutMapping("/complete/{id}")
+        @ApiOperation("value = 商家完成订单接口")
+     public Result completeOrder(@PathVariable Long id) {
+         log.info("商家完成订单，订单id：{}", id);
+         orderService.completeOrder(id);
          return Result.success();
      }
 

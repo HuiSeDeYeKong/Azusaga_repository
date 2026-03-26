@@ -411,16 +411,35 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 商家派送订单
+     *
      * @param id
      */
     public void deliveryOrder(Long id) {
         Orders ordersDB = orderMapper.getById(id);
-        if(ordersDB == null || !ordersDB.getStatus().equals(Orders.CONFIRMED) ){
+        if (ordersDB == null || !ordersDB.getStatus().equals(Orders.CONFIRMED)) {
             throw new OrderBusinessException(MessageConstant.ORDER_STATUS_ERROR);
         }
         Orders orders = Orders.builder()
                 .id(ordersDB.getId())
                 .status(Orders.DELIVERY_IN_PROGRESS)
+                .build();
+        orderMapper.update(orders);
+    }
+
+    /**
+     * 商家完成订单
+     *
+     * @param id
+     */
+    public void completeOrder(Long id) {
+        Orders ordersDB = orderMapper.getById(id);
+        if (ordersDB == null || !ordersDB.getStatus().equals(Orders.DELIVERY_IN_PROGRESS)) {
+            throw new OrderBusinessException(MessageConstant.ORDER_STATUS_ERROR);
+        }
+        Orders orders = Orders.builder()
+                .id(ordersDB.getId())
+                .status(Orders.COMPLETED)
+                .deliveryTime(LocalDateTime.now())
                 .build();
         orderMapper.update(orders);
     }
