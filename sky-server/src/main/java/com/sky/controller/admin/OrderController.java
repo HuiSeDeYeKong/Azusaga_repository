@@ -3,6 +3,7 @@ package com.sky.controller.admin;
 import com.sky.dto.OrdersConfirmDTO;
 import com.sky.dto.OrdersDTO;
 import com.sky.dto.OrdersPageQueryDTO;
+import com.sky.dto.OrdersRejectionDTO;
 import com.sky.result.PageResult;
 import com.sky.result.Result;
 import com.sky.service.OrderService;
@@ -62,11 +63,29 @@ public class OrderController {
         return Result.success(orderVO);
     }
 
+    /**
+     * 商家确认订单接口
+     * @param ordersConfirmDTO
+     * @return
+     */
     @PutMapping("/confirm")
     @ApiOperation("value = 商家确认订单接口")
     public Result confirmOrder(@RequestBody OrdersConfirmDTO ordersConfirmDTO) {
         log.info("商家确认订单，订单id：{}", ordersConfirmDTO.getId());
         orderService.confirmOrder(ordersConfirmDTO);
+        return Result.success();
+    }
+
+    /**
+     * 商家拒绝订单接口
+     * @param ordersRejectionDTO
+     * @return
+     */
+    @PutMapping("/reject")
+    @ApiOperation("value = 商家拒绝订单接口")
+    public Result rejectOrder(@RequestBody OrdersRejectionDTO ordersRejectionDTO) throws Exception {
+        log.info("商家拒绝订单，订单id：{}", ordersRejectionDTO.getId());
+        orderService.rejectOrder(ordersRejectionDTO);
         return Result.success();
     }
 
