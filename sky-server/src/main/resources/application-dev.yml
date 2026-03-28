@@ -20,3 +20,7 @@ sky:
   wechat:
     appid: wxe4aa29c608e30063
     secret: 2c29d74e9e1c0fa9e1f7618035b98c3e
+  shop:
+    address: 北京市朝阳区阜通东大街6号
+  gaode:
+    key: 51168aa6a547ae062f661e2617f5666c
