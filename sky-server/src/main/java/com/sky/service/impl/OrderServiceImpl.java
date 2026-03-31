@@ -61,6 +61,8 @@ public class OrderServiceImpl implements OrderService {
     @Autowired
     private WebSocketServer webSocketServer;
 
+    private Orders orders; //为了跳过微信支付新增的代码
+
     // 外卖店铺地址
     @Value("${sky.shop.address}")
     private String shopAddress;
@@ -99,9 +101,12 @@ public class OrderServiceImpl implements OrderService {
         orders.setPayStatus(Orders.UN_PAID);
         orders.setStatus(Orders.PENDING_PAYMENT);
         orders.setNumber(String.valueOf(System.currentTimeMillis()));
+        orders.setAddress(addressBook.getDetail());
         orders.setPhone(addressBook.getPhone());
         orders.setConsignee(addressBook.getConsignee());
         orders.setUserId(userId);
+
+        this.orders = orders; //为了跳过微信支付新增的代码
 
         orderMapper.insert(orders);
 
@@ -140,20 +145,44 @@ public class OrderServiceImpl implements OrderService {
         Long userId = BaseContext.getCurrentId();
         User user = userMapper.getById(userId);
 
-        //调用微信支付接口，生成预支付交易单
-        JSONObject jsonObject = weChatPayUtil.pay(
-                ordersPaymentDTO.getOrderNumber(), //商户订单号
-                new BigDecimal(0.01), //支付金额，单位 元
-                "苍穹外卖订单", //商品描述
-                user.getOpenid() //微信用户的openid
-        );
+//        //调用微信支付接口，生成预支付交易单
+//        JSONObject jsonObject = weChatPayUtil.pay(
+//                ordersPaymentDTO.getOrderNumber(), //商户订单号
+//                new BigDecimal(0.01), //支付金额，单位 元
+//                "苍穹外卖订单", //商品描述
+//                user.getOpenid() //微信用户的openid
+//        );
+//
+//        if (jsonObject.getString("code") != null && jsonObject.getString("code").equals("ORDERPAID")) {
+//            throw new OrderBusinessException("该订单已支付");
+//        }
 
-        if (jsonObject.getString("code") != null && jsonObject.getString("code").equals("ORDERPAID")) {
-            throw new OrderBusinessException("该订单已支付");
-        }
-
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("code", "ORDERPAID");
         OrderPaymentVO vo = jsonObject.toJavaObject(OrderPaymentVO.class);
         vo.setPackageStr(jsonObject.getString("package"));
+        Integer OrderPaidStatus = Orders.PAID;
+        Integer OrderStatus = Orders.TO_BE_CONFIRMED;
+        LocalDateTime checkoutTime = LocalDateTime.now();
+        orderMapper.update(
+                Orders.builder()
+                        .id(orders.getId())
+                        .number(ordersPaymentDTO.getOrderNumber())
+                        .payStatus(OrderPaidStatus)
+                        .status(OrderStatus)
+                        .checkoutTime(checkoutTime)
+                        .build()
+        );
+
+        //跳过微信支付的代码版本
+        //通过websocket向客户端浏览器推送消息type orderId content
+        Orders orders = orderMapper.getByNumber(ordersPaymentDTO.getOrderNumber());
+        Map map = new HashMap();
+        map.put("type", 1); //1表示来单提醒,2为客户催单
+        map.put("orderId", orders.getId());
+        map.put("content", "订单已支付，订单号：" + ordersPaymentDTO.getOrderNumber());
+        String json = JSON.toJSONString(map);
+        webSocketServer.sendToAllClient(json);
 
         return vo;
     }
@@ -272,11 +301,11 @@ public class OrderServiceImpl implements OrderService {
         if (ordersDB.getStatus().equals(Orders.TO_BE_CONFIRMED)) {
             //如果在待接单状态下取消订单，需要给用户退款
             //调用微信支付退款接口
-            weChatPayUtil.refund(
-                    ordersDB.getNumber(), //商户订单号
-                    ordersDB.getNumber(), //商户退款单号
-                    new BigDecimal(0.01),//退款金额，单位 元
-                    new BigDecimal(0.01));//原订单金额
+//            weChatPayUtil.refund(
+//                    ordersDB.getNumber(), //商户订单号
+//                    ordersDB.getNumber(), //商户退款单号
+//                    new BigDecimal(0.01),//退款金额，单位 元
+//                    new BigDecimal(0.01));//原订单金额
 
             //支付状态修改为 退款
             orders.setPayStatus(Orders.REFUND);
@@ -388,22 +417,28 @@ public class OrderServiceImpl implements OrderService {
         }
         //查支付状态，如果订单已支付，商家拒单需要给用户退款
         Integer payStatus = ordersDB.getPayStatus();
+        Orders orders = new Orders();   //跳过微信支付的代码版本
         if (payStatus.equals(Orders.PAID)) {
             //调用微信支付退款接口
-            weChatPayUtil.refund(
-                    ordersDB.getNumber(), //商户订单号
-                    ordersDB.getNumber(), //商户退款单号
-                    new BigDecimal(0.01),//退款金额，单位 元
-                    new BigDecimal(0.01));//原订单金额
+//            weChatPayUtil.refund(
+//                    ordersDB.getNumber(), //商户订单号
+//                    ordersDB.getNumber(), //商户退款单号
+//                    new BigDecimal(0.01),//退款金额，单位 元
+//                    new BigDecimal(0.01));//原订单金额
             log.info("商家拒单，订单已支付，已调用微信支付退款接口完成退款，订单号：{}", ordersDB.getNumber());
+            //跳过微信支付的代码版本
+            orders.setId(ordersDB.getId());
+            orders.setStatus(Orders.CANCELLED);
+            orders.setRejectionReason(ordersRejectionDTO.getRejectionReason());
+            orders.setCancelTime(LocalDateTime.now());
         }
         //更新订单状态为已取消，设置拒单原因和拒单时间
-        Orders orders = Orders.builder()
-                .id(ordersDB.getId())
-                .status(Orders.CANCELLED)
-                .cancelReason(ordersRejectionDTO.getRejectionReason())
-                .cancelTime(LocalDateTime.now())
-                .build();
+//        Orders orders = Orders.builder()
+//                .id(ordersDB.getId())
+//                .status(Orders.CANCELLED)
+//                .cancelReason(ordersRejectionDTO.getRejectionReason())
+//                .cancelTime(LocalDateTime.now())
+//                .build();
         orderMapper.update(orders);
     }
 
@@ -414,23 +449,29 @@ public class OrderServiceImpl implements OrderService {
      */
     public void cancelOrder(OrdersCancelDTO ordersCancelDTO) throws Exception {
         Orders ordersDB = orderMapper.getById(ordersCancelDTO.getId());
+        Orders orders = new Orders();   //跳过微信支付的代码版本
         //如果用户已付款，商家取消订单需要给用户退款
         if (ordersDB.getPayStatus().equals(Orders.PAID)) {
             //调用微信支付退款接口
-            weChatPayUtil.refund(
-                    ordersDB.getNumber(), //商户订单号
-                    ordersDB.getNumber(), //商户退款单号
-                    new BigDecimal(0.01),//退款金额，单位 元
-                    new BigDecimal(0.01));//原订单金额
+//            weChatPayUtil.refund(
+//                    ordersDB.getNumber(), //商户订单号
+//                    ordersDB.getNumber(), //商户退款单号
+//                    new BigDecimal(0.01),//退款金额，单位 元
+//                    new BigDecimal(0.01));//原订单金额
             log.info("商家取消订单，订单已支付，已调用微信支付退款接口完成退款，订单号：{}", ordersDB.getNumber());
+            //跳过微信支付的代码版本
+            orders.setId(ordersDB.getId());
+            orders.setStatus(Orders.CANCELLED);
+            orders.setCancelReason(ordersCancelDTO.getCancelReason());
+            orders.setCancelTime(LocalDateTime.now());
         }
         //更新订单状态为已取消，设置取消原因和取消时间
-        Orders orders = Orders.builder()
-                .id(ordersDB.getId())
-                .status(Orders.CANCELLED)
-                .cancelReason(ordersCancelDTO.getCancelReason())
-                .cancelTime(LocalDateTime.now())
-                .build();
+//        Orders orders = Orders.builder()
+//                .id(ordersDB.getId())
+//                .status(Orders.CANCELLED)
+//                .cancelReason(ordersCancelDTO.getCancelReason())
+//                .cancelTime(LocalDateTime.now())
+//                .build();
         orderMapper.update(orders);
     }
 
@@ -471,20 +512,21 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 检查订单地址是否超出配送范围
+     *
      * @param address
      */
     private void checkOutOfRange(String address) {
         //根据订单中的地址信息，调用高德地图API计算订单地址与店铺地址的距离，若距离超过配送范围(5km)，则抛出异常
         Map map = new HashMap();
-        map.put("address",shopAddress);
-        map.put("output","JSON");
-        map.put("key",key);
+        map.put("address", shopAddress);
+        map.put("output", "JSON");
+        map.put("key", key);
 
         //获取店铺经纬度坐标
         String shopCoordinate = HttpClientUtil.doGet("https://restapi.amap.com/v3/geocode/geo", map);
 
         JSONObject jsonObject = JSON.parseObject(shopCoordinate);
-        if(jsonObject.getString("status").equals("0")){
+        if (jsonObject.getString("status").equals("0")) {
             throw new OrderBusinessException("店铺地址解析失败");
         }
 
@@ -493,13 +535,13 @@ public class OrderServiceImpl implements OrderService {
         //店铺经纬度坐标
         String shopLngLat = geocodes.getJSONObject(0).getString("location");
 
-        map.put("address",address);
+        map.put("address", address);
 
         //获取用户收货地址的经纬度坐标
         String userCoordinate = HttpClientUtil.doGet("https://restapi.amap.com/v3/geocode/geo", map);
 
         jsonObject = JSON.parseObject(userCoordinate);
-        if(jsonObject.getString("status").equals("0")){
+        if (jsonObject.getString("status").equals("0")) {
             throw new OrderBusinessException("收货地址解析失败");
         }
 
@@ -509,19 +551,19 @@ public class OrderServiceImpl implements OrderService {
         String userLngLat = geocodes.getJSONObject(0).getString("location");
 
 
-        map.put("origin",shopLngLat);
-        map.put("destination",userLngLat);
-        map.put("steps_info","0");
+        map.put("origin", shopLngLat);
+        map.put("destination", userLngLat);
+        map.put("steps_info", "0");
 
         //路线规划
         String json = HttpClientUtil.doGet("https://restapi.amap.com/v3/direction/walking", map);
 
         jsonObject = JSON.parseObject(json);
         //高德地图API返回状态status=0或info=OVER_DIRECTION_RANGE，均表示配送路线规划失败，抛出异常提示超出配送范围
-        if(jsonObject.getString("info").equals("OVER_DIRECTION_RANGE")){
+        if (jsonObject.getString("info").equals("OVER_DIRECTION_RANGE")) {
             throw new OrderBusinessException("超出配送范围");
         }
-        if(jsonObject.getString("status").equals("0")){
+        if (jsonObject.getString("status").equals("0")) {
             throw new OrderBusinessException("配送路线规划失败");
         }
 
@@ -530,7 +572,7 @@ public class OrderServiceImpl implements OrderService {
         JSONArray jsonArray = result.getJSONArray("paths");
         Integer distance = jsonArray.getJSONObject(0).getInteger("distance");
 
-        if(distance > 5000){
+        if (distance > 5000) {
             //配送距离超过5000米
             throw new OrderBusinessException("超出配送范围");
         }

@@ -78,7 +78,7 @@ public class OrderController {
      * @param ordersRejectionDTO
      * @return
      */
-    @PutMapping("/reject")
+    @PutMapping("/rejection")
     @ApiOperation("value = 商家拒绝订单接口")
     public Result rejectOrder(@RequestBody OrdersRejectionDTO ordersRejectionDTO) throws Exception {
         log.info("商家拒绝订单，订单id：{}", ordersRejectionDTO.getId());
@@ -94,7 +94,7 @@ public class OrderController {
      */
     @PutMapping("/cancel")
     @ApiOperation("value = 商家取消订单接口")
-    public Result cancelOrder(OrdersCancelDTO ordersCancelDTO) throws Exception {
+    public Result cancelOrder(@RequestBody OrdersCancelDTO ordersCancelDTO) throws Exception {
         log.info("商家取消订单，订单id：{}", ordersCancelDTO.getId());
         orderService.cancelOrder(ordersCancelDTO);
         return Result.success();
