@@ -142,8 +142,8 @@ public class OrderServiceImpl implements OrderService {
      */
     public OrderPaymentVO payment(OrdersPaymentDTO ordersPaymentDTO) throws Exception {
         // 当前登录用户id
-        Long userId = BaseContext.getCurrentId();
-        User user = userMapper.getById(userId);
+//        Long userId = BaseContext.getCurrentId();
+//        User user = userMapper.getById(userId);
 
 //        //调用微信支付接口，生成预支付交易单
 //        JSONObject jsonObject = weChatPayUtil.pay(
@@ -157,34 +157,12 @@ public class OrderServiceImpl implements OrderService {
 //            throw new OrderBusinessException("该订单已支付");
 //        }
 
-        JSONObject jsonObject = new JSONObject();
-        jsonObject.put("code", "ORDERPAID");
-        OrderPaymentVO vo = jsonObject.toJavaObject(OrderPaymentVO.class);
-        vo.setPackageStr(jsonObject.getString("package"));
-        Integer OrderPaidStatus = Orders.PAID;
-        Integer OrderStatus = Orders.TO_BE_CONFIRMED;
-        LocalDateTime checkoutTime = LocalDateTime.now();
-        orderMapper.update(
-                Orders.builder()
-                        .id(orders.getId())
-                        .number(ordersPaymentDTO.getOrderNumber())
-                        .payStatus(OrderPaidStatus)
-                        .status(OrderStatus)
-                        .checkoutTime(checkoutTime)
-                        .build()
-        );
 
-        //跳过微信支付的代码版本
-        //通过websocket向客户端浏览器推送消息type orderId content
-        Orders orders = orderMapper.getByNumber(ordersPaymentDTO.getOrderNumber());
-        Map map = new HashMap();
-        map.put("type", 1); //1表示来单提醒,2为客户催单
-        map.put("orderId", orders.getId());
-        map.put("content", "订单已支付，订单号：" + ordersPaymentDTO.getOrderNumber());
-        String json = JSON.toJSONString(map);
-        webSocketServer.sendToAllClient(json);
-
-        return vo;
+//        OrderPaymentVO vo = jsonObject.toJavaObject(OrderPaymentVO.class);
+//        vo.setPackageStr(jsonObject.getString("package"));
+        //跳过微信支付新增的代码版本
+        paySuccess(ordersPaymentDTO.getOrderNumber()); //为了跳过微信支付新增的代码
+        return new OrderPaymentVO();
     }
 
     /**
